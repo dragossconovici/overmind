@@ -5,16 +5,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://s3.tradingview.com; style-src 'self' 'sha256-3pRED1tOXas1FXFoPb9TGCjmYe9XQsmO9OV23khV2nY=' 'sha256-JyHF32z4Ou/Ujas95CX3WgBqlTt7Dxzo/fQG5/5oBo8='; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://www.tradingview-widget.com https://s.tradingview.com; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#050608">
 <title>Overmind · XAUUSD</title>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:,">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="logo">◈</span> Overmind <span class="muted">XAUUSD</span></div>
-  <div class="price-box">
+<div class="bg-grid" aria-hidden="true"></div>
+
+<header class="hud">
+  <a class="brand" href="#analisi" aria-label="Overmind">
+    <svg class="core" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="gold-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f6dc8f"/><stop offset="1" stop-color="#9a7428"/>
+        </linearGradient>
+      </defs>
+      <circle class="ring-outer" cx="32" cy="32" r="30" fill="none" stroke="url(#gold-g)" stroke-width="1" stroke-dasharray="3 4"/>
+      <polygon points="32,7 53.6,19.5 53.6,44.5 32,57 10.4,44.5 10.4,19.5" fill="none" stroke="url(#gold-g)" stroke-width="1.4"/>
+      <path d="M13 32 Q32 14 51 32 Q32 50 13 32Z" fill="none" stroke="url(#gold-g)" stroke-width="1.6"/>
+      <circle class="iris" cx="32" cy="32" r="7.5" fill="url(#gold-g)"/>
+      <circle cx="32" cy="32" r="2.6" fill="#050608"/>
+    </svg>
+    <span>
+      <span class="wordmark">OVERMIND</span>
+      <span class="tagline">Gold Intelligence System</span>
+    </span>
+  </a>
+
+  <nav class="views" aria-label="Sezioni">
+    <a href="#analisi" data-view="analisi" class="active">Analisi</a>
+    <a href="#previsioni" data-view="previsioni">Previsioni</a>
+  </nav>
+
+  <div class="ticker">
+    <div class="ticker-label">XAU / USD</div>
     <div id="price" class="price">—</div>
-    <div id="updated" class="muted small">caricamento…</div>
+    <div class="sys"><span id="sys-dot" class="dot-pulse"></span><span id="sys-text">connessione…</span></div>
   </div>
 </header>
 
@@ -22,51 +50,117 @@
 <div id="news-flash" class="flash hidden" role="status"></div>
 
 <main>
-  <section id="tf-cards" class="cards" aria-label="Bias per timeframe"></section>
-
-  <section class="panel" id="ai-panel">
-    <h2>Perché?</h2>
-    <div id="ai"></div>
-  </section>
-
-  <section class="panel">
-    <h2>Eventi ad alto impatto (USD)</h2>
-    <div id="events"></div>
-  </section>
-
-  <section class="panel">
-    <div class="panel-head">
-      <h2>Grafico e zone</h2>
-      <div class="tabs" id="chart-tabs" role="tablist">
-        <button data-tf="W" role="tab">Weekly</button>
-        <button data-tf="D" role="tab">Daily</button>
-        <button data-tf="H4" role="tab" class="active">H4</button>
-        <button data-tf="LIVE" role="tab">Live</button>
+  <!-- ======================================================== ANALISI -->
+  <div id="view-analisi" class="view">
+    <section class="panel hero">
+      <div class="hero-text">
+        <div class="eyebrow">Verdetto di Overmind <span id="updated" class="stamp"></span></div>
+        <h1 id="verdict" class="verdict">—</h1>
+        <p id="ai-summary" class="lead"></p>
       </div>
-    </div>
-    <div id="chart" class="chart"></div>
-    <div id="live" class="chart hidden"></div>
-    <p class="muted small" id="chart-note"></p>
-  </section>
-
-  <div class="grid2">
-    <section class="panel">
-      <h2>Macro e smart money</h2>
-      <div id="macro"></div>
+      <div id="gauges" class="gauges" aria-label="Confidenza per timeframe"></div>
     </section>
+
+    <section id="tf-cards" class="cards" aria-label="Dettaglio per timeframe"></section>
+
     <section class="panel">
-      <h2>Track record</h2>
-      <div id="track"></div>
+      <div class="panel-head"><h2>Perché</h2><span class="chip">IA · dati calcolati</span></div>
+      <div id="ai"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Grafico e zone</h2>
+        <div class="tabs" id="chart-tabs" role="tablist">
+          <button data-tf="W" role="tab">W</button>
+          <button data-tf="D" role="tab">D</button>
+          <button data-tf="H4" role="tab" class="active">H4</button>
+          <button data-tf="LIVE" role="tab">Live</button>
+        </div>
+      </div>
+      <div id="chart" class="chart"></div>
+      <div id="live" class="chart hidden"></div>
+      <p class="note" id="chart-note"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Eventi ad alto impatto</h2><span class="chip">USD · 3 tori</span></div>
+      <div id="events"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <div class="panel-head"><h2>Macro e smart money</h2></div>
+        <div id="macro"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Track record</h2></div>
+        <div id="track"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ======================================================== PREVISIONI -->
+  <div id="view-previsioni" class="view hidden">
+    <section class="panel hero fc-hero">
+      <div class="hero-text">
+        <div class="eyebrow">Previsione settimana successiva <span id="fc-made" class="stamp"></span></div>
+        <h1 id="fc-title" class="verdict">—</h1>
+        <p id="fc-week" class="lead"></p>
+        <div id="fc-tug" class="tug"></div>
+      </div>
+      <div id="fc-gauge" class="gauges single"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Proiezione</h2><span class="chip">range 68% · 95%</span></div>
+      <div id="fc-chart" class="fan"></div>
+      <p class="note" id="fc-chart-note"></p>
+    </section>
+
+    <section id="fc-ranges" class="stats" aria-label="Range attesi"></section>
+
+    <div class="grid2">
+      <section class="panel">
+        <div class="panel-head"><h2>Scenari</h2></div>
+        <div id="fc-scenarios"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Cosa guida la previsione</h2></div>
+        <div id="fc-drivers"></div>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="panel">
+        <div class="panel-head"><h2>Analoghi storici</h2><span class="chip">10 anni</span></div>
+        <div id="fc-analogs"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Eventi in arrivo</h2></div>
+        <div id="fc-events"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Lettura dell'IA</h2><span class="chip">IA · dati calcolati</span></div>
+      <div id="fc-ai"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Track record previsioni</h2></div>
+      <div id="fc-track"></div>
     </section>
   </div>
 
-  <section class="panel">
-    <h2>Stato delle fonti dati</h2>
+  <section class="panel diag">
+    <div class="panel-head"><h2>Diagnostica sistema</h2><span class="chip">fonti dati</span></div>
     <div id="sources"></div>
   </section>
 
   <p class="disclaimer">Strumento personale di analisi. Non è una consulenza finanziaria né un segnale operativo.
-  La confidenza % misura l'accordo tra i fattori, non la probabilità di guadagno, finché il track record non la calibra.</p>
+  Le percentuali misurano l'accordo tra i fattori e le frequenze storiche, non la probabilità di guadagno,
+  finché il track record non le calibra.</p>
 </main>
 <script src="vendor/lightweight-charts.js"></script>
 <script src="app.js"></script>

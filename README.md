@@ -59,6 +59,22 @@ esito ✓/✗ e accuratezza complessiva. Dopo l'uscita, la reazione del prezzo d
 conta la reazione del mercato. Un evento visto per la prima volta dopo l'uscita non viene
 valutato (nessuna previsione registrata prima).
 
+## Previsioni (settimana successiva)
+
+Sezione separata del sito (`#previsioni`), calcolata in `engine/forecast.py`:
+
+- **Probabilità di rialzo** = 50% analoghi storici + 50% modello Overmind, limitata a 30–70%.
+  - *Analoghi*: settimane degli ultimi ~10 anni con lo stesso assetto (prezzo vs media a 20
+    settimane, momentum a 4 settimane, direzione dell'ultima settimana) → quante volte la
+    settimana dopo ha chiuso in rialzo (corretto verso la media se il campione è piccolo).
+  - *Modello*: punteggi Weekly e Daily (macro, COT, struttura, momentum).
+  - Sotto il 55% in una direzione la settimana è "incerta".
+- **Range 68% / 95%** dalla volatilità settimanale dell'ultimo anno, allargato del 15% se in
+  calendario ci sono CPI, PCE, NFP o decisioni Fed.
+- **Scenari** con livelli dalle zone W/D, fattori principali, eventi in arrivo, lettura IA.
+- **Track record**: la previsione viene congelata all'inizio della settimana e verificata alla
+  chiusura (direzione corretta e chiusura dentro il range 68%) in `site/data/forecast_history.json`.
+
 ## Come si legge la confidenza
 
 Ogni fattore vota da −2 a +2 con un peso diverso per timeframe (vedi `engine/scoring.py`).

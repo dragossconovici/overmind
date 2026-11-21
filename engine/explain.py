@@ -27,8 +27,9 @@ SCHEMA = {
         "D": {"type": "STRING"},
         "H4": {"type": "STRING"},
         "risks": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "next_week": {"type": "STRING"},
     },
-    "required": ["summary", "W", "D", "H4", "risks"],
+    "required": ["summary", "W", "D", "H4", "risks", "next_week"],
 }
 
 PROMPT = """Sei l'analista macro di "Overmind", uno strumento personale di analisi dell'oro (XAUUSD).
@@ -40,6 +41,8 @@ Regole tassative:
 - Non cambiare bias o confidenza: spiegali. Se la confidenza è bassa, dì chiaramente che i segnali sono in conflitto e quali.
 - Collega i fattori (es. rendimenti reali in salita = costo opportunità dell'oro più alto; dollaro forte = oro più caro per chi compra in altre valute; fondi molto long = rischio prese di profitto).
 - Non dare ordini operativi (niente "compra"/"vendi"): descrivi scenari e livelli di invalidazione.
+- "next_week": 2-4 frasi sulla previsione della settimana successiva (direzione, probabilità, range, scenario
+  alternativo ed eventi chiave), usando solo i dati di "previsione_settimana_successiva".
 - Max 3 frasi per timeframe, max 3 frasi per il riassunto, 2-4 rischi brevi.
 
 Dati:
@@ -61,6 +64,8 @@ def validate(obj) -> dict:
     if not isinstance(risks, list):
         raise ValueError("risks non lista")
     out["risks"] = [_clean(r, 300) for r in risks[:5] if isinstance(r, str) and r.strip()]
+    nw = obj.get("next_week", "")
+    out["next_week"] = _clean(nw) if isinstance(nw, str) else ""
     if not out["summary"]:
         raise ValueError("riassunto vuoto")
     return out

@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from . import calendar as cal
+from . import forecast as fc
 from . import scoring
 from .explain import explain
 from .http import register_secret, redact
@@ -150,7 +151,8 @@ def run(auto: bool = False) -> int:
         # Can't analyse without prices: republish the previous analysis, flagged as stale.
         st_ai = SourceStatus("gemini", "Spiegazione IA (Gemini)", "disabled", "Non eseguita: mancano i prezzi")
         statuses.append(st_ai)
-        out.update({k: prev.get(k) for k in ("price", "provider", "timeframes", "macro", "cot", "ai", "chart", "events")})
+        out.update({k: prev.get(k) for k in ("price", "provider", "timeframes", "macro", "cot", "ai", "chart", "events",
+                                             "forecast", "forecast_track")})
         out["analysis_stale"] = True
         out["analysis_time"] = prev.get("analysis_time")
     else:
@@ -202,6 +204,16 @@ def run(auto: bool = False) -> int:
                            for c in candles[tf][-CHART_CANDLES:]] for tf in TFS},
         })
 
+        # Next-week forecast (frozen when the target week starts, checked when it closes).
+        try:
+            forecast = fc.build(candles["W"], closed["W"], tfs, calendar, out["price"])
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            forecast = None          # never let the forecast block the main analysis
+        fc_hist = fc.update_history(read_json(DATA_DIR / "forecast_history.json", {}), forecast, closed["W"])
+        write_json(DATA_DIR / "forecast_history.json", fc_hist)
+        out["forecast"] = forecast
+        out["forecast_track"] = {"stats": fc_hist["stats"], "recent": fc_hist["recent"]}
+
         payload = {
             "prezzo": out["price"], "fonte_prezzi": prices["provider"],
             "timeframes": {tf: {"bias": tfs[tf]["bias"], "contesto": tfs[tf]["context"],
@@ -217,6 +229,11 @@ def run(auto: bool = False) -> int:
                  "previsione": e["forecast"], "precedente": e["previous"],
                  "se_sopra_attese": "rialzista" if e["sign"] > 0 else "ribassista" if e["sign"] < 0 else "dipende dai toni"}
                 for e in events["items"] if e["status"] == "upcoming"][:6],
+            "previsione_settimana_successiva": forecast and {
+                "settimana": forecast["label"], "direzione": {"bullish": "rialzista", "bearish": "ribassista"}.get(forecast["direction"], "incerta (nessuna direzione netta)"),
+                "probabilita_pct": forecast["probability"], "range_68pct": (forecast["volatility"] or {}).get("range68"),
+                "analoghi_storici": forecast["components"]["analogs"], "scenari": forecast["scenarios"],
+                "eventi_chiave": forecast["key_events"]},
             "reazioni_recenti": [{"evento": e["title"], "reazione": e["reaction"]} for e in events["recent"]],
         }
         ai, st_ai = explain(payload)

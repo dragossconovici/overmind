@@ -10,9 +10,10 @@
   const BIAS = { bullish: ["Rialzista", "bull"], bearish: ["Ribassista", "bear"], neutral: ["Neutrale", "neutral"] };
   const STATUS_IT = { ok: "OK", degraded: "Parziale", down: "Non disponibile", disabled: "Non configurata" };
   const VIEWS = ["analisi", "previsioni"];
-  const C = { bull: "#3ddc97", bear: "#f2546b", text: "#8d877a", grid: "rgba(217,180,90,0.06)", border: "rgba(217,180,90,0.16)" };
+  const C = { bull: "#3ddc97", bear: "#f2546b", gold: "#d9b45a", text: "#8d877a", grid: "rgba(217,180,90,0.06)", border: "rgba(217,180,90,0.16)" };
   const SVGNS = "http://www.w3.org/2000/svg";
 
+  let brkLines = [];
   let data = null, chart = null, series = null, currentTf = "H4", liveLoaded = false, view = "analisi";
 
   // ------------------------------------------------------------ helpers
@@ -227,6 +228,8 @@
         rightPriceScale: { borderColor: C.border },
       });
     }
+    brkLines.forEach((l) => chart.removeSeries(l));
+    brkLines = [];
     if (series) chart.removeSeries(series);
     series = chart.addCandlestickSeries({ upColor: C.bull, downColor: C.bear, borderVisible: false,
       wickUpColor: C.bull, wickDownColor: C.bear });
@@ -243,6 +246,7 @@
       series.createPriceLine({ ...opts, price: z.high, title: short + (isZoi ? " ★" : "") });
       if (z.low !== z.high) series.createPriceLine({ ...opts, price: z.low, title: "" });
     });
+    drawBreaks(tf, clean);
     // Apply the visible range after layout, otherwise the first draw (container not yet sized) is off.
     const lastN = { W: 120, D: 150, H4: 180 }[tf];
     requestAnimationFrame(() => setTimeout(() => {
@@ -250,7 +254,133 @@
       else chart.timeScale().fitContent();
     }, 30));
     $("chart-note").textContent = `Fonte: ${str(data.provider)}. OB = order block, FVG = fair value gap, ` +
-      "LIQ = liquidità; verde = domanda, rosso = offerta, ★ = zona di interesse. Aggiornato a ogni analisi (ogni 4h).";
+      "LIQ = liquidità; verde = domanda, rosso = offerta, ★ = zona di interesse. Frecce = rotture di struttura " +
+      "(BOS/CHoCH) con il livello rotto tratteggiato; linee oro puntinate = prossimo livello di rottura. Aggiornato a ogni analisi.";
+  }
+
+  // ------------------------------------------------------------ structure breaks
+  const BRK_TFS = ["D", "H4"];
+  const NEW_BARS = { W: 1, D: 3, H4: 6 };
+  const BRK_DIR = { up: ["rialzista", "bull", "▲", "sopra"], down: ["ribassista", "bear", "▼", "sotto"] };
+  const brkDir = (d) => (Object.hasOwn(BRK_DIR, d) ? BRK_DIR[d] : null);
+  const brkType = (t) => (t === "CHoCH" || t === "BOS" ? t : null);
+
+  function breaksOf(tf) {
+    const t = data && data.timeframes && data.timeframes[tf];
+    const b = t && t.analysis && t.analysis.breaks;
+    return b && typeof b === "object" ? b : null;
+  }
+  // Only well-formed entries survive: unknown type/dir or non-numeric fields are dropped.
+  function validBreaks(b) {
+    return arr(b && b.recent).filter((x) => x && brkType(x.type) && brkDir(x.dir) &&
+      num(x.level) !== null && num(x.time) !== null && num(x.swing_time) !== null && num(x.bars_ago) !== null);
+  }
+  function barTime(t, tf) {
+    const o = tf === "H4" ? { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" } :
+      tf === "W" ? { day: "2-digit", month: "short", year: "2-digit" } : { day: "2-digit", month: "short" };
+    return new Date(t * 1000).toLocaleString("it-IT", { ...o, timeZone: "Europe/Rome" });
+  }
+  function barsAgo(n) { return n <= 0 ? "ultima candela chiusa" : n === 1 ? "1 candela fa" : `${n} candele fa`; }
+
+  function watchRow(w, d, tf) {
+    const [dirTxt, cls, arrow, rel] = BRK_DIR[d];
+    if (!w || typeof w !== "object" || num(w.level) === null || !brkType(w.type)) {
+      return el("div", { class: "watch" }, el("span", { class: "arrow " + cls }, arrow),
+        el("span", { class: "lv muted" }, "—"),
+        el("span", { class: "eff" }, `Nessun ${d === "up" ? "massimo" : "minimo"} di swing ancora valido: si attende che se ne formi uno nuovo.`));
+    }
+    const choch = w.type === "CHoCH";
+    return el("div", { class: "watch" }, el("span", { class: "arrow " + cls }, arrow),
+      el("span", { class: "lv" }, fmt(w.level), num(w.dist_pct) !== null ? el("small", null, pct(w.dist_pct)) : null),
+      el("span", { class: "eff" }, `Chiusura ${TF_NAMES[tf]} ${rel} → `,
+        el("b", { class: choch ? "warn" : "" }, choch ? `CHoCH ${dirTxt}: possibile inversione` : `BOS ${dirTxt}: continuazione`)));
+  }
+
+  function renderBreaks() {
+    const box = clear($("breaks"));
+    for (const tf of BRK_TFS) {
+      const b = breaksOf(tf);
+      const col = el("div", { class: "brk-col" });
+      const trend = brkDir(b && b.trend);
+      col.append(el("div", { class: "brk-top" }, el("span", { class: "tf" }, TF_NAMES[tf]),
+        el("span", { class: "brk-state " + (trend ? trend[1] : "neutral") }, trend ? `Struttura ${trend[0]}` : "Struttura non definita")));
+      const list = validBreaks(b);
+      const last = list[0];
+      if (!last) {
+        col.append(el("p", { class: "muted" }, b ? "Nessuna rottura di struttura nelle candele analizzate." :
+          "Dati di struttura non disponibili: compariranno dopo la prossima analisi completa."));
+      } else {
+        const [dirTxt, cls, arrow, rel] = brkDir(last.dir);
+        const choch = last.type === "CHoCH";
+        const other = last.dir === "up" ? "ribassista" : "rialzista";
+        const prev = list[1];
+        const confirmed = !choch && prev && prev.type === "CHoCH" && prev.dir === last.dir;
+        const title = choch ? `Cambio di tendenza: da ${other} a ${dirTxt}` :
+          confirmed ? `Inversione ${dirTxt} confermata` : `Continuazione ${dirTxt}`;
+        const note = choch ? `Da confermare: serve un BOS ${dirTxt}, cioè una nuova chiusura oltre lo swing successivo.` :
+          confirmed ? "Al CHoCH è seguito un BOS nella stessa direzione: il nuovo trend è confermato." :
+          `Il trend ${dirTxt} prosegue.`;
+        col.append(el("div", { class: `brk-last ${cls}${choch ? " choch" : ""}` },
+          el("div", { class: "brk-kind" }, `Ultima rottura · ${last.type} ${arrow}`,
+            last.bars_ago <= NEW_BARS[tf] ? el("span", { class: "tag new" }, "NUOVA") : null),
+          el("div", { class: "brk-title " + cls }, title),
+          el("div", { class: "brk-sub" }, `Chiusura ${rel} `, el("b", null, fmt(last.level)),
+            ` · ${barsAgo(last.bars_ago)} (${barTime(last.time, tf)})`),
+          el("div", { class: "brk-sub" }, note)));
+      }
+      const wt = b && b.watch && typeof b.watch === "object" ? b.watch : {};
+      col.append(el("div", { class: "brk-h" }, "Prossimi livelli di rottura"),
+        watchRow(wt.up, "up", tf), watchRow(wt.down, "down", tf));
+      if (list.length > 1) {
+        const ul = el("ul", { class: "brk-list" });
+        list.slice(0, 6).forEach((x) => {
+          const [, cls, arrow] = brkDir(x.dir);
+          ul.append(el("li", { class: x.type === "CHoCH" ? "choch" : "" },
+            el("span", { class: cls }, arrow), el("span", { class: "t" }, x.type),
+            el("span", { class: "lvl" }, fmt(x.level)), el("span", { class: "when" }, barTime(x.time, tf))));
+        });
+        col.append(el("div", { class: "brk-h" }, "Storico rotture"), ul);
+      }
+      box.append(col);
+    }
+  }
+
+  // Hero: highlight a break that just happened on D or H4.
+  function renderBreakAlert() {
+    const box = clear($("brk-alert"));
+    for (const tf of BRK_TFS) {
+      const last = validBreaks(breaksOf(tf))[0];
+      if (!last || last.bars_ago > NEW_BARS[tf]) continue;
+      const [dirTxt, cls, arrow] = brkDir(last.dir);
+      box.append(el("span", { class: "brk-pill " + cls },
+        `${arrow} ${last.type} ${TF_NAMES[tf]} ${dirTxt}${last.type === "CHoCH" ? " · possibile inversione" : ""} · ${barsAgo(last.bars_ago)}`));
+    }
+    box.classList.toggle("hidden", !box.firstChild);
+  }
+
+  // Chart: arrow on the breaking candle, dashed segment from the swing to the break,
+  // dotted gold price lines on the next break levels.
+  function drawBreaks(tf, clean) {
+    if (!clean.length) return;
+    const first = clean[0].time, times = new Set(clean.map((r) => r.time));
+    const list = validBreaks(breaksOf(tf)).filter((x) => times.has(x.time) && x.swing_time >= first && x.swing_time < x.time);
+    series.setMarkers(list.slice().sort((a, b) => a.time - b.time).map((x) => {
+      const up = x.dir === "up";
+      return { time: x.time, position: up ? "belowBar" : "aboveBar", color: up ? C.bull : C.bear,
+        shape: up ? "arrowUp" : "arrowDown", text: x.type, size: x.type === "CHoCH" ? 2 : 1 };
+    }));
+    list.forEach((x) => {
+      const l = chart.addLineSeries({ color: x.dir === "up" ? C.bull : C.bear, lineWidth: x.type === "CHoCH" ? 2 : 1,
+        lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      l.setData([{ time: x.swing_time, value: x.level }, { time: x.time, value: x.level }]);
+      brkLines.push(l);
+    });
+    const b = breaksOf(tf), wt = b && b.watch && typeof b.watch === "object" ? b.watch : {};
+    [["up", "↑"], ["down", "↓"]].forEach(([d, a]) => {
+      const w = wt[d];
+      if (w && typeof w === "object" && num(w.level) !== null && brkType(w.type))
+        series.createPriceLine({ price: w.level, color: C.gold, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: `${w.type} ${a}` });
+    });
   }
 
   function loadLive() {
@@ -644,7 +774,7 @@
     const { problems, severe } = collectProblems(d);
     // Each section is isolated: malformed data in one part can't blank the whole page.
     const sections = {
-      "Verdetto": renderHero, "Bias per timeframe": renderCards, "Spiegazione IA": renderAI, "Macro": renderMacro,
+      "Verdetto": renderHero, "Bias per timeframe": renderCards, "Rotture": renderBreaks, "Avviso rotture": renderBreakAlert, "Spiegazione IA": renderAI, "Macro": renderMacro,
       "Notizia": renderNewsFlash, "Eventi": renderEvents, "Track record": renderTrack, "Stato fonti": renderSources,
       "Previsione": renderFcHero, "Proiezione": renderFcChart, "Range": renderFcRanges, "Scenari": renderFcScenarios,
       "Fattori previsione": renderFcDrivers, "Analoghi": renderFcAnalogs, "Eventi in arrivo": renderFcEvents,

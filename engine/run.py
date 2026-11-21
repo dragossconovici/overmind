@@ -222,7 +222,9 @@ def run(auto: bool = False) -> int:
                                 "zona_interesse": tfs[tf]["zone_of_interest"],
                                 "premium_discount": tfs[tf]["analysis"]["premium_discount"],
                                 "zone_sopra": tfs[tf]["analysis"]["zones_above"],
-                                "zone_sotto": tfs[tf]["analysis"]["zones_below"]} for tf in TFS},
+                                "zone_sotto": tfs[tf]["analysis"]["zones_below"],
+                                "rotture_recenti": tfs[tf]["analysis"]["breaks"]["recent"][:3],
+                                "prossimi_livelli_rottura": tfs[tf]["analysis"]["breaks"]["watch"]} for tf in TFS},
             "fonti_non_disponibili": [s.label for s in statuses if s.status in ("down", "disabled")],
             "prossimi_eventi_alto_impatto": [
                 {"evento": e["title"], "quando_utc": time.strftime("%a %d %H:%M", time.gmtime(e["t"])),

@@ -57,11 +57,20 @@
         <div class="eyebrow">Verdetto di Overmind <span id="updated" class="stamp"></span></div>
         <h1 id="verdict" class="verdict">—</h1>
         <p id="ai-summary" class="lead"></p>
+        <div id="brk-alert" class="brk-alert hidden"></div>
       </div>
       <div id="gauges" class="gauges" aria-label="Confidenza per timeframe"></div>
     </section>
 
     <section id="tf-cards" class="cards" aria-label="Dettaglio per timeframe"></section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Rotture di struttura</h2><span class="chip">BOS · CHoCH · chiusura candela</span></div>
+      <div id="breaks" class="brk-grid"></div>
+      <p class="note">BOS = rottura nella direzione del trend (continuazione). CHoCH = rottura contro il trend
+      (cambio di carattere: il movimento può invertire da rialzista a ribassista o viceversa).
+      Conta solo la chiusura della candela oltre l'ultimo massimo o minimo di swing, non la semplice spike.</p>
+    </section>
 
     <section class="panel">
       <div class="panel-head"><h2>Perché</h2><span class="chip">IA · dati calcolati</span></div>

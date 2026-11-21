@@ -144,6 +144,7 @@ def analyze_tf(c: list[dict], c_all: list[dict] | None = None) -> dict:
 
     last_ev = ms["events"][-1] if ms["events"] else None
     return {
+        "breaks": structure_breaks(c, ms, price),
         "price": price,
         "trend": ms["trend"],
         "last_event": last_ev and {"type": last_ev["type"], "dir": last_ev["dir"],
@@ -155,6 +156,33 @@ def analyze_tf(c: list[dict], c_all: list[dict] | None = None) -> dict:
         "zones_below": [_pub(z) for z in below],
         "zones_inside": [_pub(z) for z in inside],
     }
+
+
+MAX_BREAKS = 8
+
+
+def structure_breaks(c: list[dict], ms: dict, price: float) -> dict:
+    """Recent BOS/CHoCH (newest first) and the two levels whose break would come next.
+
+    watch.up: the last unbroken swing high. A candle CLOSE above it is a bullish break:
+    BOS if structure is already bullish, CHoCH (trend change) if it is bearish. watch.down mirrors it.
+    """
+    trend = ms["trend"]
+    recent = []
+    for ev in reversed(ms["events"][-MAX_BREAKS:]):
+        recent.append({"type": ev["type"], "dir": ev["dir"], "level": round(ev["level"], 2),
+                       "time": c[ev["i"]]["t"], "swing_time": c[ev["swing_i"]]["t"],
+                       "bars_ago": len(c) - 1 - ev["i"]})
+
+    def watch(s: dict | None, d: str) -> dict | None:
+        if not s or s["broken"]:
+            return None
+        return {"level": round(s["price"], 2), "time": c[s["i"]]["t"],
+                "type": "BOS" if trend == d else "CHoCH",
+                "dist_pct": round((s["price"] - price) / price * 100, 2)}
+
+    return {"trend": trend, "recent": recent,
+            "watch": {"up": watch(ms["last_high"], "up"), "down": watch(ms["last_low"], "down")}}
 
 
 def _pub(z: dict) -> dict:

@@ -48,6 +48,37 @@ class TestStructure(unittest.TestCase):
         self.assertEqual(ms["trend"], "down")
         self.assertIn("CHoCH", [e["type"] for e in ms["events"] if e["dir"] == "down"])
 
+    def test_breaks_newest_first_and_watch_levels(self):
+        c = candles_from(zigzag(up=True))
+        ms = structure.market_structure(c)
+        b = structure.structure_breaks(c, ms, c[-1]["c"])
+        self.assertEqual(b["trend"], "up")
+        self.assertLessEqual(len(b["recent"]), structure.MAX_BREAKS)
+        times = [x["time"] for x in b["recent"]]
+        self.assertEqual(times, sorted(times, reverse=True))
+        for x in b["recent"]:
+            self.assertLessEqual(x["swing_time"], x["time"])
+        # in an uptrend a close below the last swing low would be a trend change
+        if b["watch"]["down"]:
+            self.assertEqual(b["watch"]["down"]["type"], "CHoCH")
+            self.assertLess(b["watch"]["down"]["level"], c[-1]["c"])
+        if b["watch"]["up"]:
+            self.assertEqual(b["watch"]["up"]["type"], "BOS")
+
+    def test_breaks_after_reversal(self):
+        closes = zigzag(up=True) + [190 - i * 3 for i in range(30)]
+        c = candles_from(closes)
+        b = structure.analyze_tf(c)["breaks"]
+        self.assertEqual(b["trend"], "down")
+        self.assertEqual(b["recent"][0]["dir"], "down")
+        self.assertIn("CHoCH", [x["type"] for x in b["recent"] if x["dir"] == "down"])
+
+    def test_breaks_empty_on_flat(self):
+        c = candles_from([100.0] * 20)
+        b = structure.analyze_tf(c)["breaks"]
+        self.assertEqual(b["recent"], [])
+        self.assertIsNone(b["trend"])
+
     def test_fvg_filled_is_removed(self):
         c = [{"t": 0, "o": 100, "h": 101, "l": 99, "c": 100.5},
              {"t": 1, "o": 100.5, "h": 106, "l": 100.4, "c": 105.8},

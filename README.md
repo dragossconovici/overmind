@@ -59,6 +59,20 @@ esito ✓/✗ e accuratezza complessiva. Dopo l'uscita, la reazione del prezzo d
 conta la reazione del mercato. Un evento visto per la prima volta dopo l'uscita non viene
 valutato (nessuna previsione registrata prima).
 
+## Rotture di struttura (Daily e H4)
+
+Pannello "Rotture di struttura" nella sezione Analisi e frecce sul grafico (W/D/H4):
+
+- **BOS** = chiusura oltre l'ultimo swing nella direzione del trend (continuazione).
+- **CHoCH** = chiusura oltre l'ultimo swing contro il trend: possibile cambio da rialzista a
+  ribassista o viceversa. Se dopo un CHoCH arriva un BOS nella stessa direzione, l'inversione
+  è "confermata".
+- **Prossimi livelli di rottura**: l'ultimo massimo e minimo di swing non ancora rotti. Per
+  ognuno il sito dice se una chiusura oltre quel livello sarebbe un BOS o un CHoCH; sul grafico
+  sono le linee oro puntinate.
+- Una rottura recente (ultime 3 candele Daily / 6 candele H4) compare anche come avviso nel
+  verdetto in alto. Conta solo la chiusura della candela, non la spike.
+
 ## Previsioni (settimana successiva)
 
 Sezione separata del sito (`#previsioni`), calcolata in `engine/forecast.py`:

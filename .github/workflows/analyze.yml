@@ -1,0 +1,71 @@
+name: analyze
+
+on:
+  schedule:
+    # Check every 15 min (free on a public repo). The engine exits in seconds unless a
+    # high-impact event was just released (re-analysis ~20 min after it) or the last full
+    # analysis is ~4h old. GitHub may delay scheduled runs by a few minutes.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Least privilege: the job can only write repository contents (to commit the new data).
+permissions:
+  contents: write
+
+concurrency:
+  group: analyze
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Pinned to a full commit SHA (v5.0.0) so a moved tag can't inject code.
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 1
+
+      # No third-party Python packages: the engine uses only the standard library.
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -q
+
+      - name: Run analysis
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+        # Scheduled runs use --auto (work only when needed); manual runs always do a full analysis.
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then python3 -m engine.run --auto; else python3 -m engine.run; fi
+
+      # Safety net: refuse to publish if any secret value ended up in the output files.
+      - name: Secret leak check
+        id: leak
+        if: always()
+        env:
+          S1: ${{ secrets.FRED_API_KEY }}
+          S2: ${{ secrets.GEMINI_API_KEY }}
+          S3: ${{ secrets.TWELVEDATA_API_KEY }}
+        run: |
+          for s in "$S1" "$S2" "$S3"; do
+            if [ -n "$s" ] && grep -rqF -- "$s" site data; then
+              echo "::error::Secret found in output files, aborting publish"; exit 1
+            fi
+          done
+
+      # Runs even if the analysis failed (so the site shows the outage), never if the leak check failed.
+      - name: Commit data
+        if: always() && steps.leak.outcome == 'success'
+        run: |
+          git config user.name "overmind-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data data/cache
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -q -m "data: analysis $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do
+            git pull -q --rebase origin "${GITHUB_REF_NAME}" && git push -q origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

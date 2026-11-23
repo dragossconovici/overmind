@@ -73,9 +73,11 @@ Pannello "Rotture di struttura" nella sezione Analisi e frecce sul grafico (W/D/
 - Una rottura recente (ultime 3 candele Daily / 6 candele H4) compare anche come avviso nel
   verdetto in alto. Conta solo la chiusura della candela, non la spike.
 
-## Previsioni (settimana successiva)
+## Previsioni (settimana in corso o successiva)
 
-Sezione separata del sito (`#previsioni`), calcolata in `engine/forecast.py`:
+Sezione separata del sito (`#previsioni`), calcolata in `engine/forecast.py`.
+Da lunedì a venerdì (fino alla chiusura delle 21:00 UTC) mostra la settimana in corso, aggiornata a ogni
+analisi con un range che si stringe verso venerdì; dalla chiusura in poi passa alla settimana successiva.
 
 - **Probabilità di rialzo** = 50% analoghi storici + 50% modello Overmind, limitata a 30–70%.
   - *Analoghi*: settimane degli ultimi ~10 anni con lo stesso assetto (prezzo vs media a 20
@@ -86,8 +88,8 @@ Sezione separata del sito (`#previsioni`), calcolata in `engine/forecast.py`:
 - **Range 68% / 95%** dalla volatilità settimanale dell'ultimo anno, allargato del 15% se in
   calendario ci sono CPI, PCE, NFP o decisioni Fed.
 - **Scenari** con livelli dalle zone W/D, fattori principali, eventi in arrivo, lettura IA.
-- **Track record**: la previsione viene congelata all'inizio della settimana e verificata alla
-  chiusura (direzione corretta e chiusura dentro il range 68%) in `site/data/forecast_history.json`.
+- **Track record**: conta l'ultima previsione fatta prima dell'apertura della settimana, congelata e
+  verificata alla chiusura (direzione corretta e chiusura dentro il range 68%) in `site/data/forecast_history.json`.
 
 ## Come si legge la confidenza
 

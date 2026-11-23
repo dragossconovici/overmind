@@ -231,8 +231,10 @@ def run(auto: bool = False) -> int:
                  "previsione": e["forecast"], "precedente": e["previous"],
                  "se_sopra_attese": "rialzista" if e["sign"] > 0 else "ribassista" if e["sign"] < 0 else "dipende dai toni"}
                 for e in events["items"] if e["status"] == "upcoming"][:6],
-            "previsione_settimana_successiva": forecast and {
-                "settimana": forecast["label"], "direzione": {"bullish": "rialzista", "bearish": "ribassista"}.get(forecast["direction"], "incerta (nessuna direzione netta)"),
+            "previsione_settimana": forecast and {
+                "settimana": forecast["label"],
+                "stato": "settimana in corso" if forecast["in_progress"] else "prossima settimana",
+                "direzione": {"bullish": "rialzista", "bearish": "ribassista"}.get(forecast["direction"], "incerta (nessuna direzione netta)"),
                 "probabilita_pct": forecast["probability"], "range_68pct": (forecast["volatility"] or {}).get("range68"),
                 "analoghi_storici": forecast["components"]["analogs"], "scenari": forecast["scenarios"],
                 "eventi_chiave": forecast["key_events"]},

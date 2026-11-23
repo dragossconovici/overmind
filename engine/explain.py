@@ -41,8 +41,9 @@ Regole tassative:
 - Non cambiare bias o confidenza: spiegali. Se la confidenza è bassa, dì chiaramente che i segnali sono in conflitto e quali.
 - Collega i fattori (es. rendimenti reali in salita = costo opportunità dell'oro più alto; dollaro forte = oro più caro per chi compra in altre valute; fondi molto long = rischio prese di profitto).
 - Non dare ordini operativi (niente "compra"/"vendi"): descrivi scenari e livelli di invalidazione.
-- "next_week": 2-4 frasi sulla previsione della settimana successiva (direzione, probabilità, range, scenario
-  alternativo ed eventi chiave), usando solo i dati di "previsione_settimana_successiva".
+- "next_week": 2-4 frasi sulla previsione della settimana indicata in "previsione_settimana" (direzione,
+  probabilità, range, scenario alternativo ed eventi chiave), usando solo quei dati. Rispetta il campo "stato":
+  se è "settimana in corso" parla di "questa settimana", altrimenti di "prossima settimana".
 - Max 3 frasi per timeframe, max 3 frasi per il riassunto, 2-4 rischi brevi.
 
 Dati:

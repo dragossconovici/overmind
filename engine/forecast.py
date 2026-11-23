@@ -1,4 +1,4 @@
-"""Next-week forecast ("Previsioni").
+"""Weekly forecast ("Previsioni"): the week in progress, or the next one once it has closed.
 
 Three independent, transparent ingredients:
 
@@ -8,10 +8,11 @@ Three independent, transparent ingredients:
    overall base rate when the sample is small.
 2. Overmind's model (macro + COT + structure + momentum): the Weekly and Daily scores.
 3. Volatility: weekly return dispersion of the last year, scaled to the time left until
-   the target week closes and widened when market-moving USD data are scheduled.
+   the target week closes (it narrows as the week goes on) and widened when market-moving USD data are scheduled.
 
 P(up) = 50% analogs + 50% model, capped 30-70%: a week ahead, nobody honest is more sure.
-Each forecast is frozen when the target week starts and checked when it closes, so the
+The site's forecast keeps updating during the week. The track record instead keeps the last
+forecast made BEFORE the week opened, and checks it when the week closes, so the
 site shows a real track record (direction hit rate and how often the close fell inside
 the 68% range - a calibrated range should contain it ~2 times out of 3).
 """
@@ -27,6 +28,7 @@ from .sources import now_iso
 
 WEEK = 7 * 86400
 DAY = 86400
+WEEK_LEN = 4 * DAY + 21 * 3600   # Monday 00:00 -> Friday 21:00 UTC
 P_CAP = (30, 70)
 SHRINK = 20                 # pseudo-observations pulling analog stats to the base rate
 DIR_THRESHOLD = 5           # |P(up) - 50| below this -> no direction ("incerta")
@@ -43,9 +45,15 @@ def week_start(ts: float) -> int:
 
 
 def target_week(now: float) -> tuple[int, int]:
-    """Next trading week: Monday 00:00 UTC .. Friday 21:00 UTC (gold's weekly close)."""
-    start = week_start(now) + WEEK
-    return start, start + 4 * DAY + 21 * 3600
+    """Trading week to forecast: Monday 00:00 UTC .. Friday 21:00 UTC (gold's weekly close).
+
+    The current week until it closes; from Friday 21:00 UTC, the following one."""
+    start = week_start(now)
+    end = start + WEEK_LEN
+    if now >= end:
+        start += WEEK
+        end += WEEK
+    return start, end
 
 
 def week_label(start: int) -> str:
@@ -153,7 +161,9 @@ def build(weekly_all: list[dict], weekly_closed: list[dict], tfs: dict, calendar
     if not weekly_closed or not price:
         return None
     start, end = target_week(now)
-    an = analogs(weekly_all)
+    # The set-up is the one at the last week BEFORE the target: the target week's own
+    # forming candle must not count as "last week". (+DAY: a bar may be stamped on Sunday.)
+    an = analogs([c for c in weekly_all if week_start(c["t"] + DAY) < start])
     sw = tfs.get("W", {}).get("score", 0.0)
     sd = tfs.get("D", {}).get("score", 0.0)
     s = 0.6 * sw + 0.4 * sd
@@ -170,7 +180,7 @@ def build(weekly_all: list[dict], weekly_closed: list[dict], tfs: dict, calendar
     vol = None
     sig = weekly_sigma(weekly_closed)
     if sig:
-        horizon = max(1.0, (end - now) / DAY * 5 / 7 / 5)        # in trading weeks
+        horizon = max(0.02, min(1.0, (end - now) / WEEK_LEN))    # share of the week still to trade
         sh = sig * math.sqrt(horizon) * boost
         vol = {"sigma_week_pct": round(sig * 100, 2), "horizon_weeks": round(horizon, 2),
                "event_boost": boost > 1,
@@ -215,7 +225,7 @@ def build(weekly_all: list[dict], weekly_closed: list[dict], tfs: dict, calendar
 
     return {
         "week_start": start, "week_end": end, "label": week_label(start),
-        "made_at": now_iso(), "ref_price": round(price, 2),
+        "made_at": now_iso(), "ref_price": round(price, 2), "in_progress": now >= start,
         "direction": direction, "p_up": p_up, "probability": prob,
         "components": {"analogs": an,
                        "model": {"p_up": round(p_model, 1), "score_w": sw, "score_d": sd}},
@@ -234,7 +244,7 @@ def update_history(history, forecast: dict | None, weekly_closed: list[dict]) ->
     entries = [e for e in (entries if isinstance(entries, list) else [])
                if isinstance(e, dict) and isinstance(e.get("week_start"), int)]
     by_week = {e["week_start"]: e for e in entries}
-    if forecast:
+    if forecast and not forecast.get("in_progress"):
         # Overwritten until the target week starts, then frozen (the forecast made over the weekend).
         prev = by_week.get(forecast["week_start"])
         if prev is None or prev.get("outcome") is None:

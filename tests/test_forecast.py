@@ -30,8 +30,16 @@ class ForecastTest(unittest.TestCase):
         sat = datetime(2026, 11, 21, 12, tzinfo=timezone.utc).timestamp()
         wed = datetime(2026, 11, 18, 12, tzinfo=timezone.utc).timestamp()
         mon = datetime(2026, 11, 23, tzinfo=timezone.utc).timestamp()
-        self.assertEqual(fc.target_week(sat)[0], mon)
-        self.assertEqual(fc.target_week(wed)[0], mon)
+        prev_mon = datetime(2026, 11, 16, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(fc.target_week(sat)[0], mon)        # weekend -> the week ahead
+        self.assertEqual(fc.target_week(wed)[0], prev_mon)   # mid-week -> the current week
+        self.assertEqual(fc.target_week(mon)[0], mon)        # Monday 00:00 -> this week
+        monday_morning = datetime(2026, 11, 23, 9, 10, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(fc.target_week(monday_morning)[0], mon)
+        before_close = datetime(2026, 11, 27, 20, 59, tzinfo=timezone.utc).timestamp()
+        at_close = datetime(2026, 11, 27, 21, 0, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(fc.target_week(before_close)[0], mon)
+        self.assertEqual(fc.target_week(at_close)[0], mon + fc.WEEK)
         self.assertEqual(fc.week_label(int(mon)), "23–27 nov 2026")
 
     def test_probability_capped_and_direction(self):
@@ -53,11 +61,38 @@ class ForecastTest(unittest.TestCase):
     def test_key_event_widens_range(self):
         w = weekly()
         now = w[-1]["t"] + 3 * 86400
-        start, _ = fc.target_week(now)
         a = fc.build(w, w[:-1], tfs(0, 0), None, w[-1]["c"], now)
-        b = fc.build(w, w[:-1], tfs(0, 0), [{"t": start + 86400, "title": "CPI m/m"}], w[-1]["c"], now)
+        b = fc.build(w, w[:-1], tfs(0, 0), [{"t": now + 3600, "title": "CPI m/m"}], w[-1]["c"], now)
         self.assertGreater(b["volatility"]["range68"][1], a["volatility"]["range68"][1])
         self.assertEqual(b["key_events"], ["CPI m/m"])
+
+    def test_range_narrows_during_the_week(self):
+        w = weekly()
+        mon = fc.week_start(w[-1]["t"])
+        early = fc.build(w, w[:-1], tfs(0, 0), None, w[-1]["c"], mon + 3600)
+        late = fc.build(w, w[:-1], tfs(0, 0), None, w[-1]["c"], mon + 4 * 86400)
+        self.assertEqual(early["week_start"], late["week_start"])
+        self.assertLess(late["volatility"]["range68"][1], early["volatility"]["range68"][1])
+
+    def test_analogs_ignore_the_target_weeks_candle(self):
+        w = weekly()
+        now = w[-1]["t"] + 86400
+        spiked = w[:-1] + [dict(w[-1], c=w[-1]["o"] * 1.5, h=w[-1]["o"] * 1.5)]
+        a = fc.build(w, w[:-1], tfs(0, 0), None, w[-1]["c"], now)
+        b = fc.build(spiked, w[:-1], tfs(0, 0), None, w[-1]["c"], now)
+        self.assertEqual(a["components"]["analogs"], b["components"]["analogs"])
+
+    def test_week_in_progress_does_not_touch_track_record(self):
+        w = weekly(100)
+        sat = w[-2]["t"] - 2 * 86400
+        before = fc.build(w[:-2], w[:-2], tfs(1, 1), None, w[-3]["c"], sat)
+        self.assertFalse(before["in_progress"])
+        h = fc.update_history({}, before, w[:-2])
+        during = fc.build(w[:-1], w[:-2], tfs(-1, -1), None, 1.0, w[-2]["t"] + 86400)
+        self.assertTrue(during["in_progress"])
+        h = fc.update_history(h, during, w[:-2])
+        self.assertEqual(len(h["entries"]), 1)
+        self.assertEqual(h["entries"][0]["ref_price"], before["ref_price"])
 
     def test_short_history_does_not_crash(self):
         w = weekly(30)
@@ -66,7 +101,7 @@ class ForecastTest(unittest.TestCase):
 
     def test_history_freezes_and_evaluates(self):
         w = weekly(100)
-        now = w[-3]["t"] + 2 * 86400              # forecast for the week of w[-2]
+        now = w[-2]["t"] - 2 * 86400              # weekend before the week of w[-2]
         f = fc.build(w[:-2], w[:-3], tfs(1, 1), None, w[-3]["c"], now)
         h = fc.update_history({}, f, w[:-3])
         self.assertIsNone(h["entries"][0]["outcome"])

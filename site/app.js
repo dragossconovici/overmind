@@ -538,14 +538,18 @@
       h1.textContent = "Previsione non disponibile";
       $("fc-week").textContent = "Verrà calcolata alla prossima analisi completa.";
       $("fc-made").textContent = "";
+      $("fc-eyebrow").textContent = "Previsione settimanale";
       return;
     }
+    const inProgress = num(f.week_start) !== null && Date.now() / 1000 >= f.week_start;
+    const whenLabel = inProgress ? "Settimana in corso" : "Prossima settimana";
+    $("fc-eyebrow").textContent = "Previsione · " + whenLabel;
     const dir = Object.hasOwn(BIAS, f.direction) ? f.direction : "neutral";
     const [label, cls] = biasOf(dir);
     const prob = Math.round(num(f.probability) ?? 50);
     if (dir === "neutral") h1.append("Settimana ", el("span", { class: cls }, "incerta"), ": nessuna direzione netta");
     else h1.append("Settimana ", el("span", { class: cls }, label.toLowerCase()), ` · ${prob}% di probabilità`);
-    $("fc-week").textContent = `Settimana ${str(f.label)} · prezzo di riferimento ${fmt(num(f.ref_price))}. ` +
+    $("fc-week").textContent = `${whenLabel}: ${str(f.label)} · prezzo di riferimento ${fmt(num(f.ref_price))}. ` +
       (dir === "neutral" ? "Modello macro/strutturale e statistiche storiche si contraddicono." :
         `Probabilità che la settimana chiuda ${dir === "bullish" ? "sopra" : "sotto"} il prezzo attuale.`);
     $("fc-made").textContent = "· " + fmtTime(f.made_at);
@@ -554,7 +558,7 @@
     b.style.width = (100 - up) + "%"; u.style.width = up + "%";
     tug.append(el("div", { class: "tug-bar" }, b, u, el("div", { class: "tug-mid" })),
       el("div", { class: "tug-legend" }, el("span", { class: "bear" }, `▼ Ribasso ${100 - up}%`), el("span", { class: "bull" }, `Rialzo ${up}% ▲`)));
-    g.append(gauge(prob, cls, prob + "%", "PROBABILITÀ", "Prossima settimana", dir === "neutral" ? "Incerta" : label));
+    g.append(gauge(prob, cls, prob + "%", "PROBABILITÀ", whenLabel, dir === "neutral" ? "Incerta" : label));
   }
 
   function renderFcChart() {
@@ -754,8 +758,8 @@
       box.append(el("div", { class: "scroll-x" }, el("table", null, el("thead", null, el("tr", null, el("th", null, "Settimana"),
         el("th", null, "Previsione"), el("th", null, "Prezzo"), el("th", null, "Esito"), el("th", null, "Range 68%"))), tbody)));
     }
-    box.append(el("p", { class: "note" }, "Ogni previsione viene congelata quando la settimana inizia (quella calcolata nel weekend) " +
-      "e verificata alla chiusura del venerdì. La prima verifica arriva dopo la prima settimana completa."));
+    box.append(el("p", { class: "note" }, "La previsione sul sito si aggiorna durante la settimana; per il track record conta quella " +
+      "calcolata prima dell'apertura, che viene congelata e verificata alla chiusura del venerdì. La prima verifica arriva dopo la prima settimana completa."));
   }
 
   // ------------------------------------------------------------ views

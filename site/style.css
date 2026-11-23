@@ -208,7 +208,9 @@ tr.next td:first-child { box-shadow: inset 2px 0 0 var(--gold); }
 .fan .c95 { fill: rgba(217, 180, 90, .07); }
 .fan .c68 { fill: rgba(217, 180, 90, .16); }
 .fan .c-edge { fill: none; stroke: rgba(217, 180, 90, .45); stroke-dasharray: 2 3; }
-.fan .path { fill: none; stroke: var(--text); stroke-width: 1.8; }
+.fan .wick { stroke-width: 1.2; }
+.fan .wick.bull { stroke: var(--bull); } .fan .wick.bear { stroke: var(--bear); }
+.fan .body.bull { fill: var(--bull); } .fan .body.bear { fill: var(--bear); }
 .fan .now { fill: var(--gold-hi); }
 .fan .now-ring { fill: none; stroke: var(--gold-hi); opacity: .4; }
 .fan .lvl { stroke-width: 1; stroke-dasharray: 5 5; }

@@ -565,8 +565,9 @@
     const f = forecast();
     const box = clear($("fc-chart"));
     const rows = data && data.chart ? arr(data.chart.D) : [];
-    const pts = rows.filter((r) => Array.isArray(r) && r.length === 5 && r.every((x) => num(x) !== null)).slice(-30)
-      .map((r) => [r[0], r[4]]);
+    const bars = rows.filter((r) => Array.isArray(r) && r.length === 5 && r.every((x) => num(x) !== null)).slice(-30)
+      .map((r) => ({ t: r[0], o: r[1], h: Math.max(r[1], r[2], r[3], r[4]), l: Math.min(r[1], r[2], r[3], r[4]), c: r[4] }));
+    const pts = bars.map((b) => [b.t, b.c]);
     const v = f && f.volatility;
     if (!f || !v || pts.length < 5 || !Array.isArray(v.range68) || !Array.isArray(v.range95)) {
       emptyNote(box, "Proiezione non disponibile.");
@@ -583,18 +584,27 @@
 
     const narrow = box.clientWidth > 0 && box.clientWidth < 600;
     const W = narrow ? 460 : 900, H = narrow ? 300 : 340, L = 8, R = narrow ? 64 : 92, T = 26, B = 30;
-    const tMin = pts[0][0], tMax = we;
-    let yMin = Math.min(lo95, ...pts.map((p) => p[1])), yMax = Math.max(hi95, ...pts.map((p) => p[1]));
+    // Horizontal axis in candles: no holes on weekends; after the last candle, one slot per day.
+    const slotOf = (t) => {
+      const n = bars.length;
+      if (t >= bars[n - 1].t) return n - 1 + (t - bars[n - 1].t) / 86400;
+      if (t <= bars[0].t) return 0;
+      const i = bars.findIndex((b) => b.t > t);
+      return i - 1 + (t - bars[i - 1].t) / (bars[i].t - bars[i - 1].t);
+    };
+    const slots = slotOf(we) + 0.5;
+    let yMin = Math.min(lo95, ...bars.map((b) => b.l)), yMax = Math.max(hi95, ...bars.map((b) => b.h));
     levels.forEach((z) => { if (z.low >= yMin * 0.97 && z.high <= yMax * 1.03) { yMin = Math.min(yMin, z.low); yMax = Math.max(yMax, z.high); } });
     const pad = (yMax - yMin) * 0.06; yMin -= pad; yMax += pad;
-    const x = (t) => L + (t - tMin) / (tMax - tMin) * (W - L - R);
+    const x = (t) => L + (slotOf(t) + 0.5) / (slots + 0.5) * (W - L - R);
     const y = (p) => T + (yMax - p) / (yMax - yMin) * (H - T - B);
     const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Proiezione del prezzo con range 68% e 95%" });
 
     for (let i = 0; i < 4; i++) {
       const p = yMin + (yMax - yMin) * i / 4;
       s.append(svg("line", { class: "grid", x1: L, x2: W - R, y1: y(p), y2: y(p) }));
-      s.append(svg("text", { class: "axis", x: W - R + 8, y: y(p) + 4 }, fmt(p, 0)));
+      if (Math.abs(y(p) - y(hi68)) > 14 && Math.abs(y(p) - y(lo68)) > 14)
+        s.append(svg("text", { class: "axis", x: W - R + 8, y: y(p) + 4 }, fmt(p, 0)));
     }
     s.append(svg("rect", { class: "week", x: x(ws), y: T - 14, width: Math.max(2, x(we) - x(ws)), height: H - T - B + 14 }));
     s.append(svg("text", { class: "week-label", x: x(we) - 4, y: T - 3, "text-anchor": "end" },
@@ -602,7 +612,7 @@
     // date ticks
     pts.forEach((p, i) => {
       if (i % (narrow ? 12 : 7) !== 0) return;
-      s.append(svg("text", { class: "axis", x: x(p[0]), y: H - 8, "text-anchor": "middle" },
+      s.append(svg("text", { class: "axis", x: x(p[0]), y: H - 8, "text-anchor": i === 0 ? "start" : "middle" },
         new Date(p[0] * 1000).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })));
     });
 
@@ -624,6 +634,14 @@
     s.append(svg("polyline", { class: "c-edge", points: c68.up }));
     s.append(svg("polyline", { class: "c-edge", points: c68.dn }));
 
+    const bodyW = Math.max(2, (W - L - R) / (slots + 0.5) * 0.68);
+    bars.forEach((b) => {
+      const cls = b.c >= b.o ? "bull" : "bear", cx = x(b.t);
+      const top = y(Math.max(b.o, b.c)), bottom = y(Math.min(b.o, b.c));
+      s.append(svg("line", { class: "wick " + cls, x1: cx, x2: cx, y1: y(b.h), y2: y(b.l) }));
+      s.append(svg("rect", { class: "body " + cls, x: cx - bodyW / 2, y: top, width: bodyW, height: Math.max(1, bottom - top) }));
+    });
+
     const usedY = [];
     levels.forEach((z) => {
       const cls = z.dir === "bull" ? "bull" : "bear";
@@ -635,15 +653,12 @@
         `${str(z.type) === "Order block" ? "OB" : str(z.type).slice(0, 4)} ${str(z.tf)} ${fmt(z.low, 0)}–${fmt(z.high, 0)}`));
     });
 
-    const line = pts.map((p) => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`);
-    line.push(`${x(t0).toFixed(1)},${y(price).toFixed(1)}`);
-    s.append(svg("polyline", { class: "path", points: line.join(" ") }));
     s.append(svg("circle", { class: "now-ring", cx: x(t0), cy: y(price), r: 8 }));
     s.append(svg("circle", { class: "now", cx: x(t0), cy: y(price), r: 3.5 }));
     s.append(svg("text", { class: "end-label", x: x(we) + 6, y: y(hi68) + 4 }, fmt(hi68, 0)));
     s.append(svg("text", { class: "end-label", x: x(we) + 6, y: y(lo68) + 4 }, fmt(lo68, 0)));
     box.append(s);
-    $("fc-chart-note").textContent = "Linea: chiusure Daily. Cono chiaro: range 68% (circa 2 settimane su 3 la chiusura cade qui); " +
+    $("fc-chart-note").textContent = "Candele Daily (verde = rialzo, rosso = ribasso). Cono chiaro: range 68% (circa 2 settimane su 3 la chiusura cade qui); " +
       "cono tenue: range 95%. Il cono si allarga con la radice del tempo; linee tratteggiate: zone W/D più vicine.";
   }
 
